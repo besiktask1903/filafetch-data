@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nXaQZ5qnfSChNvdbYLa7DTRl3oDIrU6MLRoAHABdpAY='; style-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">
+<title>FilaFetch email setup</title><style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#101019;color:#f0edf9}body{margin:0;padding:24px 18px 48px}main{max-width:480px;margin:auto}h1{font-size:26px}p,li{line-height:1.5;color:#c4bfd1}a{color:#c5afff}label{display:block;margin:20px 0 6px}input,textarea,button{box-sizing:border-box;width:100%;font:inherit;border-radius:12px;padding:14px;border:1px solid #484052;background:#1b1925;color:inherit}button{margin:18px 0 0;background:#baa2f5;color:#1a102b;border:0;font-weight:700;min-height:50px}button:disabled{opacity:.5}textarea{font:14px ui-monospace,monospace;min-height:160px;overflow-wrap:anywhere}small{color:#afa8bf}.note{padding:14px;background:#231e33;border-radius:12px}#status{min-height:24px}#result[hidden]{display:none}
+</style></head><body><main>
+<h1>FilaFetch email setup</h1>
+<p>Do these steps on your phone. This sets up scanner reports to <strong>iamdebugging@gmail.com</strong>.</p>
+<ol><li>Open <a href="https://myaccount.google.com/apppasswords?authuser=iamdebugging%40gmail.com" target="_blank" rel="noopener noreferrer">Google App passwords</a>. Sign in to your Gmail account and complete any verification. Google may require 2-Step Verification first.</li>
+<li>Create an app password named <strong>FilaFetch Scanner</strong>. Copy Google's 16-character app password.</li>
+<li>Return here, paste it below, and tap <strong>Create encrypted setup code</strong>.</li></ol>
+<p class="note">Enter the app password, never your normal Google password. Encryption happens on your phone. This page does not send the password to a server or store it. Only your Mac has the matching private key.</p>
+<form id="setup" autocomplete="off"><label for="sender">Gmail account that created the app password</label>
+<input id="sender" type="email" value="iamdebugging@gmail.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+<label for="password">Google app password</label><input id="password" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="16 characters; spaces are OK">
+<button id="encrypt" type="submit">Create encrypted setup code</button></form>
+<p id="status" role="status"></p><section id="result" hidden><label for="code">Encrypted setup code</label><textarea id="code" readonly spellcheck="false"></textarea>
+<button id="copy" type="button">Copy setup code</button><p>Paste this encrypted code into our chat. Keep the actual app password out of the chat.</p></section>
+<small id="expiry"></small>
+</main><script>
+const config={"nonce":"a1d1c7b2d48aff77ee854232e7239e62","expires_at":"2026-10-27T00:45:45.711472+00:00","public_key":"MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAzeUFornLhJw/9jW8nWd29jK+TANhMwKCQgi30n8szdYZHTwKWKiJcGcdkK7SOMDUxQK7vyABMW9XVIfu4jEapJMPSmcD500GG8migZsFWZ2ksUXJ24GDNazqVVRGYcOOBTC6Tshd01H0xPLeGdXQ0ke2DtP76UIulNU74nRChquuyS82j3OjKXoaZiTId4hrl3FwhaGxexc7m1x6VYxEjvnGRCMpTA1S+i0SU3PtRpaoFyJg6BIadMZn2RogBrKNag6fEQe+nrFT1ahBu7maXZhhwgHN8w8rFy37nedbBLrdA2+11h57e/GkT+6aDVmZFHV8N3AI5D2uaD9uO/qpTgnPMN8r4k1H9f8IObbp3ZhOvikyeVd+r2VHZse+OPBWoaTJe7HUnvY80bTbiFEtq+Oo1TWJhAgCzTc7NoTZ7AxScLtaWXu6xyFreyMgBKIj7w11tFZXcPEAkL9nULJoFaZNtsgMnTN980fiTaun3WW1GRPN2lvCZ9tYoOpkpA+1AgMBAAE="};
+const byId=id=>document.getElementById(id);
+byId('expiry').textContent='Setup link expires '+new Date(config.expires_at).toLocaleString()+'.';
+byId('setup').addEventListener('submit',async event=>{
+ event.preventDefault();byId('status').textContent='';byId('result').hidden=true;byId('code').value='';
+ const sender=byId('sender').value.trim(),password=byId('password').value.replace(/\s/g,'');
+ if(Date.now()>=Date.parse(config.expires_at)){byId('status').textContent='This setup link expired. Ask for a new link.';return;}
+ if(!/^[A-Za-z0-9._%+-]{1,64}@gmail\.com$/.test(sender)){byId('status').textContent='Enter the Gmail account used to create the app password.';return;}
+ if(!/^[A-Za-z0-9]{16}$/.test(password)){byId('status').textContent='Use the 16-character app password from Google, not your account password.';return;}
+ byId('encrypt').disabled=true;
+ try{
+  const der=Uint8Array.from(atob(config.public_key),char=>char.charCodeAt(0));
+  const key=await crypto.subtle.importKey('spki',der,{name:'RSA-OAEP',hash:'SHA-256'},false,['encrypt']);
+  const payload=new TextEncoder().encode(JSON.stringify({purpose:'filafetch-scan-email',nonce:config.nonce,sender,password}));
+  const encrypted=new Uint8Array(await crypto.subtle.encrypt({name:'RSA-OAEP'},key,payload));
+  byId('code').value='FFMAIL1.'+btoa(String.fromCharCode(...encrypted)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  byId('password').value='';byId('result').hidden=false;byId('status').textContent='Encrypted. Copy the setup code below and send it in our chat.';
+ }catch{byId('status').textContent='Encryption failed. Use an up-to-date browser and this HTTPS setup link.';}
+ finally{byId('encrypt').disabled=false;}
+});
+byId('copy').addEventListener('click',async()=>{
+ try{await navigator.clipboard.writeText(byId('code').value);byId('status').textContent='Setup code copied. Paste it in our chat.';}
+ catch{byId('code').focus();byId('code').select();byId('status').textContent='Select and copy the encrypted code, then paste it in our chat.';}
+});
+</script></body></html>
